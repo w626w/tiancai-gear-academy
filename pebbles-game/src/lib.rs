@@ -1,12 +1,13 @@
-#![no_std]
-use gstd::{exec, msg};
+ #![no_std]
+use gstd::{};
 use pebbles_game_io::*;
 
-static mut PEBBLES_GAME: Option<GameState> = None;
+static mut PEBBLES_GAME:Option<GameState> = None;
+
 
 #[no_mangle]
-extern "C" fn init() {
- // 加载并验证初始消息
+ extern "C" fn init() {
+// 加载并验证初始消息
  let init_msg: PebblesInit = msg::load().expect("Failed to load PebblesInit");
 
  // 确保初始石子数量大于 0
@@ -66,9 +67,8 @@ extern "C" fn init() {
  }
 }
 
-
 #[no_mangle]
-extern "C" fn handle() {
+ extern "C" fn handle() {
  // 加载并处理动作消息
  let action: PebblesAction = msg::load().expect("Failed to load PebblesAction");
 
@@ -153,41 +153,9 @@ extern "C" fn handle() {
 }
 
 #[no_mangle]
-extern "C" fn state() {
+ extern "C" fn state() {
  // 获取当前游戏状态并回复给调用者
  let game_state = unsafe { PEBBLES_GAME.as_ref().expect("Game state not initialized") };
  msg::reply(game_state, 0).expect("Failed to reply with game state");
 }
-
-#[cfg(not(test))]
-fn get_random_u32() -> u32 {
- // 获取随机数种子并生成随机数
- let salt = msg::id();
- let (hash, _num) = exec::random(salt.into()).expect("get_random_u32(): random call failed");
- u32::from_le_bytes([hash[0], hash[1], hash[2], hash[3]])
-}
-
-#[cfg(test)]
-fn get_random_u32() -> u32 {
- 1
-}
-
-fn program_turn(game_state: &GameState) -> u32 {
- // 根据游戏难度选择程序的回合策略
- match game_state.difficulty {
-  DifficultyLevel::Easy => (get_random_u32() % game_state.max_pebbles_per_turn) + 1,
-  DifficultyLevel::Hard => {
-   // 实现困难难度下的优化回合策略
-   let target = game_state.max_pebbles_per_turn + 1;
-   let remainder = game_state.pebbles_remaining % target;
-   if remainder == 0 {
-    game_state.max_pebbles_per_turn
-   } else {
-    remainder
-   }
-  }
- }
-}
-
-
 
