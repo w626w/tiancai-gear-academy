@@ -1,5 +1,5 @@
  #![no_std]
-use gstd::{};
+use gstd::{exec,msg};
 use pebbles_game_io::*;
 
 static mut PEBBLES_GAME:Option<GameState> = None;
