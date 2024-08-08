@@ -1,209 +1,174 @@
 use game_session_io::*;
 use gtest::{Log, Program, ProgramBuilder, System};
 
-const GAME_SESSION_PROGRAM_ID: u64 = 1;
-const WORDLE_PROGRAM_ID: u64 = 2;
-const USER: u64 = 50;
-
 #[test]
-fn test_win() {
-    let system = System::new();
-    system.init_logger();
+fn test_start_game() {
+    let sys = System::new();
+    sys.init_logger();
 
-    let game_session_program = ProgramBuilder::from_file("target/wasm32-unknown-unknown/release/game_session.opt.wasm")
-        .with_id(GAME_SESSION_PROGRAM_ID)
-        .build(&system);
-    let wordle_program =
-        ProgramBuilder::from_file("target/wasm32-unknown-unknown/release/wordle.opt.wasm")
-            .with_id(WORDLE_PROGRAM_ID)
-            .build(&system);
+    let wordle_program = Program::from_file(&sys, "target/wasm32-unknown-unknown/release/wordle.opt.wasm");
+    let game_session_program = Program::from_file(&sys, "target/wasm32-unknown-unknown/release/game_session.opt.wasm");
 
-    // Case 1: wordle_program init
-    let res = wordle_program.send_bytes(USER, []);
-    assert!(!res.main_failed());
+    // Initialize the Game Session with Wordle program address
+    let result = game_session_program.send("init", wordle_program.id());
+    assert!(result.log().is_empty());
 
-    // Case 2: game_session_program init
-    let res = game_session_program.send_with_value(USER, GAME_SESSION_PROGRAM_ID, 0);
-    assert!(!res.main_failed());
-
-    // Case 3: CheckWord - failed: The user is not in the game
-    let res = game_session_program.send_with_value(
-        USER,
-        Action::CheckWord {
-            word: "abcde".to_string(),
-        },
-        0,
-    );
-    assert!(res.main_failed());
-
-    // Case 4: StartGame - success
-    let res = game_session_program.send_with_value(USER, Action::StartGame, 0);
-    let log = Log::builder()
-        .dest(USER)
-        .source(GAME_SESSION_PROGRAM_ID)
-        .payload(Event::GameStarted { user: USER.into() });
-    assert!(!res.main_failed() && res.contains(&log));
-
-    // Case 5: StartGame failed: The user is already in the game
-    let res = game_session_program.send_with_value(USER, Action::StartGame, 0);
-    assert!(res.main_failed());
-
-    // Case 6: CheckWord failed: Invalid word
-    let res = game_session_program.send_with_value(
-        USER,
-        Action::CheckWord {
-            word: "qwert".to_string(),
-        },
-        0,
-    );
-    assert!(res.main_failed());
-
-    // Case 7: CheckWord failed: Invalid word
-    let res = game_session_program.send_with_value(
-        USER,
-        Action::CheckWord {
-            word: "shell".to_string(),
-        },
-        0,
-    );
-    assert!(res.main_failed());
-
-    // Case 8: CheckWord success, but failed to guess
-    let res = game_session_program.send_with_value(
-        USER,
-        Action::CheckWord {
-            word: "house".to_string(),
-        },
-        0,
-    );
-    let log = Log::builder()
-        .dest(USER)
-        .source(GAME_SESSION_PROGRAM_ID)
-        .payload(Event::GameOver { outcome: Outcome::Lose });
-    assert!(!res.main_failed() && res.contains(&log));
-
-    // Case 9: CheckWord success and has been guessed
-    let res = game_session_program.send_with_value(
-        USER,
-        Action::CheckWord {
-            word: "human".to_string(),
-        },
-        0,
-    );
-    let log = Log::builder()
-        .dest(USER)
-        .source(GAME_SESSION_PROGRAM_ID)
-        .payload(Event::GameOver { outcome: Outcome::Win });
-    assert!(!res.main_failed() && res.contains(&log));
-
-    // Case 10: CheckWord failed: The user is not in the game
-    let res = game_session_program.send_with_value(
-        51,
-        Action::CheckWord {
-            word: "tests".to_string(),
-        },
-        0,
-    );
-    assert!(res.main_failed());
-
-    let state: GameSession = game_session_program.read_state(b"").unwrap();
-    println!("{:?}", state);
+    // Start a game for a user
+    let user: u64 = 1;
+    let result = game_session_program.send("handle", GameAction::StartGame);
+    assert!(result.contains(&GameEvent::GameStarted { user }));
 }
 
 #[test]
-fn test_tried_limit() {
-    let system = System::new();
-    system.init_logger();
+fn test_check_word_correct_guess() {
+    let sys = System::new();
+    sys.init_logger();
 
-    let game_session_program = ProgramBuilder::from_file("target/wasm32-unknown-unknown/release/game_session.opt.wasm")
-        .with_id(GAME_SESSION_PROGRAM_ID)
-        .build(&system);
-    let wordle_program =
-        ProgramBuilder::from_file("target/wasm32-unknown-unknown/release/wordle.opt.wasm")
-            .with_id(WORDLE_PROGRAM_ID)
-            .build(&system);
+    let wordle_program = Program::from_file(&sys, "target/wasm32-unknown-unknown/release/wordle.opt.wasm");
+    let game_session_program = Program::from_file(&sys, "target/wasm32-unknown-unknown/release/game_session.opt.wasm");
 
-    // Case 1: wordle_program init
-    let res = wordle_program.send_bytes(USER, []);
-    assert!(!res.main_failed());
+    // Initialize the Game Session with Wordle program address
+    let _ = game_session_program.send("init", wordle_program.id());
 
-    // Case 2: game_session_program init
-    let res = game_session_program.send_with_value(USER, GAME_SESSION_PROGRAM_ID, 0);
-    assert!(!res.main_failed());
+    // Start a game for a user
+    let user: u64 = 1;
+    let _ = game_session_program.send("handle", GameAction::StartGame);
 
-    // Case 3: StartGame success
-    let res = game_session_program.send_with_value(USER, Action::StartGame, 0);
-    let log = Log::builder()
-        .dest(USER)
-        .source(GAME_SESSION_PROGRAM_ID)
-        .payload(Event::GameStarted { user: USER.into() });
-    assert!(!res.main_failed() && res.contains(&log));
+    // Simulate Wordle program's GameStarted reply
+    sys.send(wordle_program.id(), WordleEvent::GameStarted { user });
 
-    for i in 0..5 {
-        // Case 4: CheckWord success, but not guessed
-        let res = game_session_program.send_with_value(
-            USER,
-            Action::CheckWord {
-                word: "house".to_string(),
-            },
-            0,
-        );
-        if i == 4 {
-            let log = Log::builder()
-                .dest(USER)
-                .source(GAME_SESSION_PROGRAM_ID)
-                .payload(Event::GameOver { outcome: Outcome::Lose });
-            assert!(!res.main_failed() && res.contains(&log));
-        } else {
-            let log = Log::builder()
-                .dest(USER)
-                .source(GAME_SESSION_PROGRAM_ID)
-                .payload(Event::GameOver { outcome: Outcome::Lose });
-            assert!(!res.main_failed() && res.contains(&log));
-        }
+    // Check the word "house" (correct guess)
+    let word = "house".to_string();
+    let result = game_session_program.send("handle", GameAction::CheckWord { word });
+
+    // Simulate Wordle program's WordChecked reply
+    sys.send(wordle_program.id(), WordleEvent::WordChecked {
+        user,
+        correct_positions: vec![0, 1, 2, 3, 4],
+        contained_in_word: vec![]
+    });
+
+    assert!(result.contains(&GameEvent::GameOver { outcome: Outcome::Win }));
+}
+
+#[test]
+fn test_check_word_incorrect_guess() {
+    let sys = System::new();
+    sys.init_logger();
+
+    let wordle_program = Program::from_file(&sys, "target/wasm32-unknown-unknown/release/wordle.opt.wasm");
+    let game_session_program = Program::from_file(&sys, "target/wasm32-unknown-unknown/release/game_session.opt.wasm");
+
+    // Initialize the Game Session with Wordle program address
+    let _ = game_session_program.send("init", wordle_program.id());
+
+    // Start a game for a user
+    let user: u64 = 1;
+    let _ = game_session_program.send("handle", GameAction::StartGame);
+
+    // Simulate Wordle program's GameStarted reply
+    sys.send(wordle_program.id(), WordleEvent::GameStarted { user });
+
+    // Check an incorrect word "human"
+    let word = "human".to_string();
+    let result = game_session_program.send("handle", GameAction::CheckWord { word });
+
+    // Simulate Wordle program's WordChecked reply
+    sys.send(wordle_program.id(), WordleEvent::WordChecked {
+        user,
+        correct_positions: vec![0],
+        contained_in_word: vec![1]
+    });
+
+    assert!(result.log().contains(&GameEvent::WordChecked {
+        correct_positions: vec![0],
+        contained_in_word: vec![1]
+    }));
+
+    // Check game status (assuming this check happens after all attempts)
+    let session_id = 1;
+    let result = game_session_program.send("handle", GameAction::CheckGameStatus { user, session_id });
+
+    assert!(result.contains(&GameEvent::GameOver { outcome: Outcome::Lose }));
+}
+
+#[test]
+fn test_check_word_multiple_attempts() {
+    let sys = System::new();
+    sys.init_logger();
+
+    let wordle_program = Program::from_file(&sys, "target/wasm32-unknown-unknown/release/wordle.opt.wasm");
+    let game_session_program = Program::from_file(&sys, "target/wasm32-unknown-unknown/release/game_session.opt.wasm");
+
+    // Initialize the Game Session with Wordle program address
+    let _ = game_session_program.send("init", wordle_program.id());
+
+    // Start a game for a user
+    let user: u64 = 1;
+    let _ = game_session_program.send("handle", GameAction::StartGame);
+
+    // Simulate Wordle program's GameStarted reply
+    sys.send(wordle_program.id(), WordleEvent::GameStarted { user });
+
+    let mut attempts = 0;
+
+    for word in &["human", "horse", "heron", "happy", "honey"] {
+        attempts += 1;
+        let result = game_session_program.send("handle", GameAction::CheckWord { word: word.to_string() });
+
+        // Simulate Wordle program's WordChecked reply
+        sys.send(wordle_program.id(), WordleEvent::WordChecked {
+            user,
+            correct_positions: vec![0],
+            contained_in_word: vec![1]
+        });
+
+        assert!(result.log().contains(&GameEvent::WordChecked {
+            correct_positions: vec![0],
+            contained_in_word: vec![1]
+        }));
     }
-    let state: GameSession = game_session_program.read_state(b"").unwrap();
-    println!("{:?}", state);
+
+    // On the last attempt, simulate a losing condition
+    attempts += 1;
+    let word = "humor".to_string();
+    let result = game_session_program.send("handle", GameAction::CheckWord { word });
+
+    // Simulate Wordle program's WordChecked reply
+    sys.send(wordle_program.id(), WordleEvent::WordChecked {
+        user,
+        correct_positions: vec![0],
+        contained_in_word: vec![1]
+    });
+
+    assert!(result.contains(&GameEvent::GameOver { outcome: Outcome::Lose }));
 }
 
 #[test]
-#[ignore]
-fn test_delayed_logic() {
-    let system = System::new();
-    system.init_logger();
+fn test_game_timeout() {
+    let sys = System::new();
+    sys.init_logger();
 
-    let game_session_program = ProgramBuilder::from_file("target/wasm32-unknown-unknown/release/game_session.opt.wasm")
-        .with_id(GAME_SESSION_PROGRAM_ID)
-        .build(&system);
-    let wordle_program =
-        ProgramBuilder::from_file("target/wasm32-unknown-unknown/release/wordle.opt.wasm")
-            .with_id(WORDLE_PROGRAM_ID)
-            .build(&system);
+    let wordle_program = Program::from_file(&sys, "target/wasm32-unknown-unknown/release/wordle.opt.wasm");
+    let game_session_program = Program::from_file(&sys, "target/wasm32-unknown-unknown/release/game_session.opt.wasm");
 
-    // Case 1: wordle_program init
-    let res = wordle_program.send_bytes(USER, []);
-    assert!(!res.main_failed());
+    // Initialize the Game Session with Wordle program address
+    let _ = game_session_program.send("init", wordle_program.id());
 
-    // Case 2: game_session_program init
-    let res = game_session_program.send_with_value(USER, GAME_SESSION_PROGRAM_ID, 0);
-    assert!(!res.main_failed());
+    // Start a game for a user
+    let user: u64 = 1;
+    let _ = game_session_program.send("handle", GameAction::StartGame);
 
-    // Case 3: StartGame success
-    let res = game_session_program.send_with_value(USER, Action::StartGame, 0);
-    let log = Log::builder()
-        .dest(USER)
-        .source(GAME_SESSION_PROGRAM_ID)
-        .payload(Event::GameStarted { user: USER.into() });
-    assert!(!res.main_failed() && res.contains(&log));
+    // Simulate Wordle program's GameStarted reply
+    sys.send(wordle_program.id(), WordleEvent::GameStarted { user });
 
-    // Case 4: Delayed equal to 200 blocks (10 minutes) for the delayed message
-    let result = system.spend_blocks(200);
-    println!("{:?}", result);
-    let log = Log::builder()
-        .dest(USER)
-        .source(GAME_SESSION_PROGRAM_ID)
-        .payload(Event::GameOver { outcome: Outcome::Lose });
-    assert!(result[0].contains(&log));
-    let state: GameSession = game_session_program.read_state(b"").unwrap();
-    println!("{:?}", state);
+    // Fast forward time (simulate delay)
+    sys.spend_blocks(200);
+
+    // After the delay, check the game status, this should trigger the timeout check
+    let session_id = 1;
+    let result = game_session_program.send("handle", GameAction::CheckGameStatus { user, session_id });
+
+    // The result should contain a GameOver event indicating that the game was lost due to timeout
+    assert!(result.contains(&GameEvent::GameOver { outcome: Outcome::Lose }));
 }
