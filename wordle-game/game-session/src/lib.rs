@@ -3,21 +3,8 @@
 use gstd::{msg, exec, prelude::*, ActorId};
 use game_session_io::*;
 
-
-
 static mut GAME_SESSION: Option<GameSession> = None;
 
-fn get_game_session_mut() -> &'static mut GameSession {
-    unsafe {
-        GAME_SESSION.as_mut().expect("GameSession is not initialized")
-    }
-}
-
-fn get_game_session() -> &'static GameSession {
-    unsafe {
-        GAME_SESSION.as_ref().expect("GameSession is not initialized")
-    }
-}
 
 #[no_mangle]
 extern "C" fn init() {
@@ -154,4 +141,16 @@ extern "C" fn state() {
         games: game_session.games.clone(),
         next_session_id: game_session.next_session_id,
     }, 0).expect("Failed to send state reply");
+}
+
+fn get_game_session_mut() -> &'static mut GameSession {
+    unsafe {
+        GAME_SESSION.as_mut().expect("GameSession is not initialized")
+    }
+}
+
+fn get_game_session() -> &'static GameSession {
+    unsafe {
+        GAME_SESSION.as_ref().expect("GameSession is not initialized")
+    }
 }
