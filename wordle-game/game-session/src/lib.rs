@@ -1,10 +1,9 @@
 #![no_std]
 
-use gstd::{msg, exec, prelude::*, ActorId};
 use game_session_io::*;
+use gstd::{exec, msg, prelude::*, ActorId};
 
 static mut GAME_SESSION: Option<GameSession> = None;
-
 
 #[no_mangle]
 extern "C" fn init() {
@@ -42,7 +41,8 @@ extern "C" fn handle() {
                     game_session.wordle_program,
                     WordleAction::StartGame { user: caller },
                     0,
-                ).expect("Failed to send StartGame action");
+                )
+                .expect("Failed to send StartGame action");
 
                 msg::send_delayed(
                     exec::program_id(),
@@ -52,7 +52,8 @@ extern "C" fn handle() {
                     },
                     0,
                     200,
-                ).expect("Failed to send delayed message");
+                )
+                .expect("Failed to send delayed message");
 
                 exec::wait();
             }
@@ -62,12 +63,10 @@ extern "C" fn handle() {
                 if let GameState::InProgress = game_status.status {
                     msg::send(
                         game_session.wordle_program,
-                        WordleAction::CheckWord {
-                            user: caller,
-                            word,
-                        },
+                        WordleAction::CheckWord { user: caller, word },
                         0,
-                    ).expect("Failed to send CheckWord action");
+                    )
+                    .expect("Failed to send CheckWord action");
 
                     game_status.status = GameState::InProgress;
                     exec::wait();
@@ -85,8 +84,14 @@ extern "C" fn handle() {
                             }
                             GameState::InProgress => {
                                 game_status.status = GameState::GameOver(Outcome::Lose);
-                                msg::send(user, Event::GameOver { outcome: Outcome::Lose }, 0)
-                                    .expect("Failed to send GameOver event");
+                                msg::send(
+                                    user,
+                                    Event::GameOver {
+                                        outcome: Outcome::Lose,
+                                    },
+                                    0,
+                                )
+                                .expect("Failed to send GameOver event");
                             }
                             _ => {}
                         }
@@ -101,7 +106,7 @@ extern "C" fn handle() {
 extern "C" fn handle_reply() {
     let wordle_event: WordleEvent = msg::load().expect("Failed to load reply message");
     let game_session = get_game_session_mut();
-    let user = wordle_event.get_user().clone();
+    let user = *wordle_event.get_user();
 
     match wordle_event {
         WordleEvent::GameStarted { .. } => {
@@ -118,12 +123,24 @@ extern "C" fn handle_reply() {
                 game_status.attempts += 1;
                 if correct_positions == vec![0, 1, 2, 3, 4] {
                     game_status.status = GameState::GameOver(Outcome::Win);
-                    msg::send(user, Event::GameOver { outcome: Outcome::Win }, 0)
-                        .expect("Failed to send GameOver event");
+                    msg::send(
+                        user,
+                        Event::GameOver {
+                            outcome: Outcome::Win,
+                        },
+                        0,
+                    )
+                    .expect("Failed to send GameOver event");
                 } else if game_status.attempts >= 6 {
                     game_status.status = GameState::GameOver(Outcome::Lose);
-                    msg::send(user, Event::GameOver { outcome: Outcome::Lose }, 0)
-                        .expect("Failed to send GameOver event");
+                    msg::send(
+                        user,
+                        Event::GameOver {
+                            outcome: Outcome::Lose,
+                        },
+                        0,
+                    )
+                    .expect("Failed to send GameOver event");
                 } else {
                     game_status.status = GameState::InProgress;
                 }
@@ -136,21 +153,29 @@ extern "C" fn handle_reply() {
 #[no_mangle]
 extern "C" fn state() {
     let game_session = get_game_session();
-    msg::reply(GameSession {
-        wordle_program: game_session.wordle_program,
-        games: game_session.games.clone(),
-        next_session_id: game_session.next_session_id,
-    }, 0).expect("Failed to send state reply");
+    msg::reply(
+        GameSession {
+            wordle_program: game_session.wordle_program,
+            games: game_session.games.clone(),
+            next_session_id: game_session.next_session_id,
+        },
+        0,
+    )
+    .expect("Failed to send state reply");
 }
 
 fn get_game_session_mut() -> &'static mut GameSession {
     unsafe {
-        GAME_SESSION.as_mut().expect("GameSession is not initialized")
+        GAME_SESSION
+            .as_mut()
+            .expect("GameSession is not initialized")
     }
 }
 
 fn get_game_session() -> &'static GameSession {
     unsafe {
-        GAME_SESSION.as_ref().expect("GameSession is not initialized")
+        GAME_SESSION
+            .as_ref()
+            .expect("GameSession is not initialized")
     }
 }
