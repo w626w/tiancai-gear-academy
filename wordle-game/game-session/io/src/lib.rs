@@ -1,23 +1,23 @@
 #![no_std]
 
 use gmeta::{In, InOut, Metadata, Out};
-use gstd::{ prelude::*, ActorId};
+use gstd::{prelude::*, ActorId};
 
-#[derive(Debug, Encode, Decode, TypeInfo)]
+#[derive(Debug, Encode, Decode, TypeInfo, Clone)]
 pub enum Action {
     StartGame,
     CheckWord { word: String },
     CheckGameStatus { user: ActorId, session_id: u64 },
 }
 
-#[derive(Debug, Encode, Decode, TypeInfo)]
+#[derive(Debug, Encode, Decode, TypeInfo, Clone)]
 pub enum Event {
     GameStarted { user: ActorId },
     GameOver { outcome: Outcome },
     GameNotFound { user: ActorId },
 }
 
-#[derive(Debug, Encode, Decode, TypeInfo)]
+#[derive(Debug, Encode, Decode, TypeInfo, Clone)]
 pub struct GameSession {
     pub wordle_program: ActorId,
     pub games: Vec<GameStatus>,
@@ -54,7 +54,9 @@ pub enum WordleAction {
 
 #[derive(Debug, Clone, Encode, Decode, TypeInfo)]
 pub enum WordleEvent {
-    GameStarted { user: ActorId },
+    GameStarted {
+        user: ActorId,
+    },
     WordChecked {
         user: ActorId,
         correct_positions: Vec<u8>,
