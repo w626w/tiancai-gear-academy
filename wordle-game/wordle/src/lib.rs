@@ -36,6 +36,7 @@ extern "C" fn handle() {
             if word.len() != 5 {
                 panic!("The length of the word exceeds 5");
             }
+
             let key_word = wordle
                 .games
                 .get(&user)
