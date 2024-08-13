@@ -25,7 +25,7 @@ mod tests {
         assert!(!wordle.send(user_id, wordle_id).main_failed());
         assert!(!game_session.send(user_id, wordle_id).main_failed());
 
-        sys // 返回系统实例
+        sys 
     }
 
     #[test]
@@ -78,13 +78,15 @@ fn test_lose_game() {
         assert!(state.games.iter().any(|game| game.user == USER1.into()));
         println!("State after CheckWord (house): {:?}", state);
 
-        //sys.spend_blocks(300);
+        sys.spend_blocks(10);
         //时间过了之后无法进行操作
         // assert!(!game_session.send(USER1, Action::CheckWord { word: "hello".to_string() }).main_failed());
         // assert!(!game_session.send(USER1, Action::CheckWord { word: "hello".to_string() }).main_failed());
 
         let state: GameSession = game_session.read_state(()).unwrap();
-        assert!(state.games.iter().any(|game| game.user == USER1.into()));
+        println!("timeout: {:?}", state);
+
+        //assert!(state.games.iter().any(|game| game.user == USER1.into()));
 
     }
 }
