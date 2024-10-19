@@ -24,6 +24,6 @@ jobs:
 
       - name: Check and test
         run: |
-          cd wordle-game
+          cd pebbles-game
           cargo clippy --all-targets -- -D warnings -A unused-imports
           cargo test
